@@ -13,13 +13,13 @@ Console.WriteLine(sql);
 
 static string BuildSqlOuter(string json)
 {
-    var parentObject = JsonConvert.DeserializeObject<JObject>(json);
+    if (json == null) throw new ArgumentNullException(nameof(json));
+    
+    var parentObject = JsonConvert.DeserializeObject<JObject>(json)!;
     var sb = new StringBuilder();
     sb.AppendLine("where");
 
-  
-
-  return BuildSql(parentObject, "json ->");
+    return BuildSql(parentObject, "json ->");
 }
 
 //todo: escape this
@@ -102,7 +102,7 @@ static string BuildSql(JObject parentObject, string path)
 
 static string GetOrPredicate(string path, KeyValuePair<string, JToken?> prop)
 {
-    var parts = prop.Value as JArray;
+    var parts = (JArray)prop.Value!;
     var x = parts.Cast<JObject>().ToArray();
     var res = x.Select(y => BuildSql(y, path)).ToArray();
     return $"( {string.Join(" OR ", res)} )";
