@@ -1,0 +1,21 @@
+version: "3.9"
+services:
+
+  eventsourcing-db:
+    image: postgres
+    restart: always
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_DB: dummy
+      POSTGRES_USER: dummy
+      POSTGRES_PASSWORD: dummy
+    networks:
+      - dummy
+
+volumes:
+  esdata:
+    driver: local
+
+networks:
+  dummy: null
