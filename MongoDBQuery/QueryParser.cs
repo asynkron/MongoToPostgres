@@ -23,8 +23,9 @@ public static class QueryParser
     private static string GetPredicate(string path, KeyValuePair<string, JToken?> prop, JToken firstProp, string op)
     {
         var val = GetPrimitive(firstProp);
+        var type = GetTypeHint(firstProp);
         var key = GetKey(path, prop);
-        var cond = $"({key} {op} {val})";
+        var cond = $"(({key}){type} {op} {val})";
         return cond;
     }
 
@@ -38,6 +39,16 @@ public static class QueryParser
             JTokenType.Array   => "ARRAY",
             JTokenType.Null    => "null",
             _                  => throw new ArgumentOutOfRangeException()
+        };
+    
+    private static string GetTypeHint(JToken prop) =>
+        prop.Type switch
+        {
+            JTokenType.Integer => "::float",
+            JTokenType.Float   => "::float",
+            JTokenType.String  => "::text",
+            JTokenType.Boolean => "::bool",
+            _                  => "",
         };
 
     //TODO: make proper escape
