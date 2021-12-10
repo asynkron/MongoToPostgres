@@ -10,6 +10,10 @@ var json = @"{$or:[{age: {$gte: 21}, name: 'julio', contribs: { $in: [ 'ALGOL', 
 var sql = BuildSqlOuter(json);
 Console.WriteLine(sql);
 
+//TODO:
+// * Dot-notation keys
+// * Array comparison (subqueries?)
+// * In vs Contains what is what here?
 
 static string BuildSqlOuter(string json)
 {
