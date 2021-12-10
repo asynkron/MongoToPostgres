@@ -5,7 +5,7 @@ using Newtonsoft.Json.Linq;
 
 Console.WriteLine("Hello, World!");
 
-var json = @"{$or:[{age: {$gte: 21}, name: 'julio', contribs: { $in: [ 'ALGOL', 'Lisp' ]}}, {x:123}]}";
+var json = @"{$or:[{'age.year': {$gte: 21}, name: 'julio', contribs: { $in: [ 'ALGOL', 'Lisp' ]}}, {x:123}]}";
 
 var sql = BuildSqlOuter(json);
 Console.WriteLine(sql);
@@ -31,7 +31,8 @@ static string BuildSqlOuter(string json)
 static string GetPredicate(string path, KeyValuePair<string, JToken?> prop,JToken firstProp, string op)
 {
     var val = GetPrimitive(firstProp);
-    var cond = $"({path} '{prop.Key}' {op} {val})";
+    var key = GetKey(path, prop);
+    var cond = $"({key} {op} {val})";
     return cond;
 }
 
@@ -49,12 +50,13 @@ static string GetPrimitive(JToken prop) =>
 
 static string EscapeString(string sqlStr) => sqlStr;
 
-static string GetContainsPredicate(string path, JProperty firstProp, KeyValuePair<string, JToken?> prop)
+static string GetInPredicate(string path, JProperty firstProp, KeyValuePair<string, JToken?> prop)
 {
     var x = firstProp.Value as JArray;
     var values = x.Cast<JValue>();
     var values2 = values.Select(GetPrimitive);
-    var cond = $"({path} '{prop.Key}' CONTAINS ({string.Join(", ", values2)}))";
+    var key = GetKey(path, prop);
+    var cond = $"({key} IN ({string.Join(", ", values2)}))";
     return cond;
 }
 
@@ -81,7 +83,7 @@ static string BuildSql(JObject parentObject, string path)
             {
                 var cond = firstProp.Name switch
                 {
-                    "$in"  => GetContainsPredicate(path, firstProp, prop),
+                    "$in"  => GetInPredicate(path, firstProp, prop),
                     "$gte" => GetPredicate(path, prop, firstProp.Value, ">="),
                     "$gt"  => GetPredicate(path, prop, firstProp.Value, ">"),
                     "lt"   => GetPredicate(path, prop, firstProp.Value, "<"),
@@ -110,4 +112,11 @@ static string GetOrPredicate(string path, KeyValuePair<string, JToken?> prop)
     var x = parts.Cast<JObject>().ToArray();
     var res = x.Select(y => BuildSql(y, path)).ToArray();
     return $"( {string.Join(" OR ", res)} )";
+}
+
+static string GetKey(string path, KeyValuePair<string, JToken?> prop)
+{
+    var keys = prop.Key.Split(".").Select(k => $"'{k}'");
+    var key = string.Join(" ->> ", keys);
+    return $"{path} {key}";
 }
