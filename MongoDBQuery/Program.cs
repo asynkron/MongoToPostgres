@@ -21,6 +21,13 @@ var store = new DocumentStore(storeOptions);
 var json = @"{FirstName:'Han', 'Data.foo': 1}";
 var sql = QueryParser.ToSql(json, "data");
 Console.WriteLine(sql);
+await using var session = store.QuerySession();
+var existing = await session.QueryAsync<User>(sql);
+
+foreach (var res in existing)
+{
+    Console.WriteLine(res.Id);
+}
 
 public class User
 {
