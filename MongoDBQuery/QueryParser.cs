@@ -20,10 +20,10 @@ public static class QueryParser
         return "WHERE" + "\n" + BuildSql(parentObject, $"{jsonField}");
     }
 
-    private static string GetPredicate(string path, KeyValuePair<string, JToken?> prop, JToken firstProp, string op)
+    private static string GetPredicate(string path, JProperty prop, JToken operationProp, string op)
     {
-        var val = GetPrimitive(firstProp);
-        var type = GetTypeHint(firstProp);
+        var val = GetPrimitive(operationProp);
+        var type = GetTypeHint(operationProp);
         var key = GetKey(path, prop);
         var cond = $"(({key}){type} {op} {val})";
         return cond;
@@ -54,7 +54,7 @@ public static class QueryParser
     //TODO: make proper escape
     private static string EscapeString(string sqlStr) => sqlStr.Replace("\\", "\\\\");
 
-    private static string GetInPredicate(string path, JProperty firstProp, KeyValuePair<string, JToken?> prop)
+    private static string GetInPredicate(string path, JProperty firstProp, JProperty prop)
     {
         var x = firstProp.Value as JArray;
         var values = x.Cast<JValue>();
@@ -67,11 +67,11 @@ public static class QueryParser
     private static string BuildSql(JObject parentObject, string path)
     {
         var lines = new List<string>();
-        foreach (var prop in parentObject)
+        foreach (var prop in parentObject.Children().OfType<JProperty>())
         {
-            if (prop.Key.StartsWith("$"))
+            if (prop.Name.StartsWith("$"))
             {
-                if (prop.Key == "$or")
+                if (prop.Name == "$or")
                 {
                     return GetOrPredicate(path, prop);
                 }
@@ -82,28 +82,31 @@ public static class QueryParser
             //normal object, AND predicates together
             if (prop.Value is JObject childObject)
             {
-                var childProps = childObject.Children().ToArray();
-                if (childProps.FirstOrDefault() is JProperty firstProp && firstProp.Name.StartsWith("$"))
+                var childProps = childObject
+                    .Children()
+                    .OfType<JProperty>()
+                    .Where(p => p.Name.StartsWith("$"))
+                    .ToArray();
+                
+                if (childProps.Any())
                 {
-                    var cond = firstProp.Name switch
+                    foreach (var firstProp in childProps)
                     {
-                        "$in"  => GetInPredicate(path, firstProp, prop),
-                        "$gte" => GetPredicate(path, prop, firstProp.Value, ">="),
-                        "$gt"  => GetPredicate(path, prop, firstProp.Value, ">"),
-                        "$lt"   => GetPredicate(path, prop, firstProp.Value, "<"),
-                        "$lte"  => GetPredicate(path, prop, firstProp.Value, "<="),
-                        _      => ""
-                    };
-                    lines.Add(cond);
+                        var cond = GetAnyPredicate(path, firstProp, prop);
+                        if (cond != null)
+                        {
+                            lines.Add(cond);
+                        }
+                    }
                 }
                 else
                 {
-                    BuildSql(childObject, $"{path} '{prop.Key}'->");
+                    BuildSql(childObject, $"{path} '{prop.Name}'->");
                 }
             }
             else
             {
-                lines.Add(GetPredicate(path, prop, prop.Value!, "="));
+                lines.Add(GetPredicate(path, prop, prop.Value, "="));
             }
         }
 
@@ -111,17 +114,29 @@ public static class QueryParser
         ;
     }
 
-    private static string GetOrPredicate(string path, KeyValuePair<string, JToken?> prop)
+    private static string? GetAnyPredicate(string path, JProperty firstProp, JProperty prop) =>
+        firstProp.Name switch
+        {
+            "$in"    => GetInPredicate(path, firstProp, prop),
+            "$gte"   => GetPredicate(path, prop, firstProp.Value, ">="),
+            "$gt"    => GetPredicate(path, prop, firstProp.Value, ">"),
+            "$lt"    => GetPredicate(path, prop, firstProp.Value, "<"),
+            "$lte"   => GetPredicate(path, prop, firstProp.Value, "<="),
+            "$regex" => GetPredicate(path, prop, firstProp.Value, "~"),
+            _        => null
+        };
+
+    private static string GetOrPredicate(string path, JProperty prop)
     {
-        var parts = (JArray)prop.Value!;
+        var parts = (JArray)prop.Value;
         var x = parts.Cast<JObject>().ToArray();
         var res = x.Select(y => BuildSql(y, path)).ToArray();
         return $"( {string.Join(" OR ", res)} )";
     }
 
-    private static string GetKey(string path, KeyValuePair<string, JToken?> prop)
+    private static string GetKey(string path, JProperty prop)
     {
-        var keys = prop.Key.Split(".").Select(k => $"'{k}'").ToArray();
+        var keys = prop.Name.Split(".").Select(k => $"'{k}'").ToArray();
         var key = string.Join("->", keys.Take(keys.Length-1));
         if (key != "")
         {
