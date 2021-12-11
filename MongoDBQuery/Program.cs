@@ -19,7 +19,8 @@ var store = new DocumentStore(storeOptions);
 // }
 
 //var json = @"{$or:[{'age.year': {$gte: 21}, name: 'julio', contribs: { $in: [ 'ALGOL', 'Lisp' ]}}, {x: {$gt:0}]}";
-var json = @"{FirstName:'Han', 'Data.foo': {$not: {$lt:0}}, 'Data.bar': [2,3]}";
+//var json = @"{FirstName:'Luke', 'Data.foo': {$not: {$lt:0}}, 'Data.bar': {'$in': [1,2,3,4]}";
+var json = @"{ 'FirstName': {'$in': ['Han','Luke']}";
 var sql = QueryParser.ToSql(json, "data");
 Console.WriteLine(sql);
 await using var session2 = store.QuerySession();

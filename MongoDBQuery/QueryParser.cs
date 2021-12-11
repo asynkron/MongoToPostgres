@@ -14,7 +14,7 @@ public static class QueryParser
     {
         if (json == null) throw new ArgumentNullException(nameof(json));
         var parentObject = JsonConvert.DeserializeObject<JObject>(json)!;
-        return "WHERE" + "\n" + GetLogicalPredicate(parentObject, $"{jsonField}");
+        return $"WHERE {GetLogicalPredicate(parentObject, $"{jsonField}")}";
     }
 
     private static string GetPredicate(string path, JProperty prop, JToken operationProp, string op)
@@ -29,10 +29,10 @@ public static class QueryParser
     private static string GetPrimitive(JToken prop) =>
         prop.Type switch
         {
-            JTokenType.Integer => prop.Value<int>().ToString(CultureInfo.InvariantCulture),
-            JTokenType.Float   => prop.Value<float>().ToString(CultureInfo.InvariantCulture),
-            JTokenType.String  => $"'{EscapeString(prop.Value<string>()!)}'",
-            JTokenType.Boolean => prop.Value<bool>().ToString(CultureInfo.InvariantCulture),
+            JTokenType.Integer => prop.Value<int>().ToString(CultureInfo.InvariantCulture) + "::float",
+            JTokenType.Float   => prop.Value<float>().ToString(CultureInfo.InvariantCulture)+ "::float",
+            JTokenType.String  => $"'{EscapeString(prop.Value<string>()!)}'"+ "::text",
+            JTokenType.Boolean => prop.Value<bool>().ToString(CultureInfo.InvariantCulture)+ "::bool",
             JTokenType.Array   => GetArray(prop),
             JTokenType.Null    => "null",
             _                  => throw new ArgumentOutOfRangeException()
@@ -63,11 +63,29 @@ public static class QueryParser
 
     private static string GetInPredicate(string path, JProperty firstProp, JProperty prop)
     {
+        //$in should operate on scalar values.. TODO rewrite
+
         var x = firstProp.Value as JArray;
         var values = x.Cast<JValue>();
         var values2 = values.Select(GetPrimitive);
         var key = GetKey(path, prop);
-        var cond = $"({key} IN ({string.Join(", ", values2)}))";
+        var type = GetTypeHint(prop);
+        var val = string.Join(", ", values2) ;
+        var cond = $"(({key}){type} IN ({val}))";
+    //     var cond = $@"(
+    // EXISTS(
+    //     SELECT t123.e123 
+    //     FROM jsonb_array_elements(({key})::jsonb) AS t123(e123) 
+    //     WHERE e123::int IN ()
+    // ))";
+    
+    //     var cond = $@"(
+    // EXISTS(
+    //     SELECT t123.e123 
+    //     FROM jsonb_array_elements(({key})::jsonb) AS t123(e123) 
+    //     WHERE e123::int IN ({string.Join(", ", values2)})
+    // ))";
+        
         return cond;
     }
 
@@ -113,23 +131,35 @@ public static class QueryParser
             }
         }
 
-        return string.Join(" AND ", lines);
+        return string.Join("\nAND ", lines);
     }
 
     private static string? GetAnyPredicate(string path, JProperty firstProp, JProperty prop) =>
         firstProp.Name switch
         {
-            "$in"    => GetInPredicate(path, firstProp, prop),
-            "$not"   => GetNotPredicate(path, prop, firstProp),
-            "$eq"    => GetPredicate(path, prop, firstProp.Value, "="),
-            "$neq"   => GetPredicate(path, prop, firstProp.Value, "!="),
-            "$gte"   => GetPredicate(path, prop, firstProp.Value, ">="),
-            "$gt"    => GetPredicate(path, prop, firstProp.Value, ">"),
-            "$lt"    => GetPredicate(path, prop, firstProp.Value, "<"),
-            "$lte"   => GetPredicate(path, prop, firstProp.Value, "<="),
-            "$regex" => GetPredicate(path, prop, firstProp.Value, "~"),
-            _        => null
+            "$in"        => GetInPredicate(path, firstProp, prop),
+            "$not"       => GetNotPredicate(path, prop, firstProp),
+            "$eq"        => GetPredicate(path, prop, firstProp.Value, "="),
+            "$neq"       => GetPredicate(path, prop, firstProp.Value, "!="),
+            "$gte"       => GetPredicate(path, prop, firstProp.Value, ">="),
+            "$gt"        => GetPredicate(path, prop, firstProp.Value, ">"),
+            "$lt"        => GetPredicate(path, prop, firstProp.Value, "<"),
+            "$lte"       => GetPredicate(path, prop, firstProp.Value, "<="),
+            "$regex"     => GetPredicate(path, prop, firstProp.Value, "~"),
+            "$elemMatch" => GetElemMatchPredicate(path, prop, firstProp.Value),
+            "$all"       => GetAllMatchPredicate(path, prop, firstProp.Value),
+            _            => null
         };
+
+    private static string? GetAllMatchPredicate(string path, JProperty prop, JToken firstPropValue)
+    {
+        throw new NotImplementedException();
+    }
+
+    private static string? GetElemMatchPredicate(string path, JProperty prop, JToken firstPropValue)
+    {
+        throw new NotImplementedException();
+    }
 
     private static string? GetNotPredicate(string path, JProperty prop, JProperty firstProp)
     {
