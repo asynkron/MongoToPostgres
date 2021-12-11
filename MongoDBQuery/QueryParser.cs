@@ -110,6 +110,9 @@ public static class QueryParser
         firstProp.Name switch
         {
             "$in"    => GetInPredicate(path, firstProp, prop),
+            "$not"   => GetNotPredicate(path, prop, firstProp),
+            "$eq"    => GetPredicate(path, prop, firstProp.Value, "="),
+            "$neq"   => GetPredicate(path, prop, firstProp.Value, "!="),
             "$gte"   => GetPredicate(path, prop, firstProp.Value, ">="),
             "$gt"    => GetPredicate(path, prop, firstProp.Value, ">"),
             "$lt"    => GetPredicate(path, prop, firstProp.Value, "<"),
@@ -117,6 +120,14 @@ public static class QueryParser
             "$regex" => GetPredicate(path, prop, firstProp.Value, "~"),
             _        => null
         };
+
+    private static string? GetNotPredicate(string path, JProperty prop, JProperty firstProp)
+    {
+        var o = firstProp.Value as JObject;
+        var p = o.Properties().First();
+        var x = GetAnyPredicate(path, p, prop);
+        return $"(NOT {x})";
+    }
 
     private static string GetOrPredicate(string path, JProperty prop)
     {
