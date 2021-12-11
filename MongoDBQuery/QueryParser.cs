@@ -1,5 +1,4 @@
 using System.Globalization;
-using System.Text;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 
@@ -66,26 +65,28 @@ public static class QueryParser
 
     private static string BuildSql(JObject parentObject, string path)
     {
+        foreach (var prop in parentObject.Properties().Where(p => p.Name.StartsWith("$")))
+        {
+            if (prop.Name == "$or")
+            {
+                return GetOrPredicate(path, prop);
+            }
+
+            return "UNKNOWN";
+        }
+
+        return GetAndPredicate(parentObject, path);
+    }
+
+    private static string GetAndPredicate(JObject parentObject, string path)
+    {
         var lines = new List<string>();
         foreach (var prop in parentObject.Properties())
         {
-            if (prop.Name.StartsWith("$"))
-            {
-                if (prop.Name == "$or")
-                {
-                    return GetOrPredicate(path, prop);
-                }
-
-                return "UNKNOWN";
-            }
-
             //normal object, AND predicates together
             if (prop.Value is JObject childObject)
             {
-                var childProps = childObject.Properties()
-                    .Where(p => p.Name.StartsWith("$"))
-                    .ToArray();
-                
+                var childProps = childObject.Properties().Where(p => p.Name.StartsWith("$")).ToArray();
                 if (childProps.Any())
                 {
                     foreach (var firstProp in childProps)
@@ -104,12 +105,12 @@ public static class QueryParser
             }
             else
             {
-                lines.Add(GetPredicate(path, prop, prop.Value, "="));
+                var predicate = GetPredicate(path, prop, prop.Value, "=");
+                lines.Add(predicate);
             }
         }
 
         return string.Join(" AND ", lines);
-        ;
     }
 
     private static string? GetAnyPredicate(string path, JProperty firstProp, JProperty prop) =>
