@@ -13,10 +13,8 @@ public static class QueryParser
     public static string ToSql(string json, string jsonField)
     {
         if (json == null) throw new ArgumentNullException(nameof(json));
-
         var parentObject = JsonConvert.DeserializeObject<JObject>(json)!;
-
-        return "WHERE" + "\n" + BuildSql(parentObject, $"{jsonField}");
+        return "WHERE" + "\n" + GetLogicalPredicate(parentObject, $"{jsonField}");
     }
 
     private static string GetPredicate(string path, JProperty prop, JToken operationProp, string op)
@@ -39,7 +37,7 @@ public static class QueryParser
             JTokenType.Null    => "null",
             _                  => throw new ArgumentOutOfRangeException()
         };
-    
+
     private static string GetTypeHint(JToken prop) =>
         prop.Type switch
         {
@@ -47,7 +45,7 @@ public static class QueryParser
             JTokenType.Float   => "::float",
             JTokenType.String  => "::text",
             JTokenType.Boolean => "::bool",
-            _                  => "",
+            _                  => ""
         };
 
     //TODO: make proper escape
@@ -63,27 +61,25 @@ public static class QueryParser
         return cond;
     }
 
-    private static string BuildSql(JObject parentObject, string path)
+    private static string GetLogicalPredicate(JObject parentObject, string path)
     {
+        //OR
         foreach (var prop in parentObject.Properties().Where(p => p.Name.StartsWith("$")))
         {
-            if (prop.Name == "$or")
-            {
-                return GetOrPredicate(path, prop);
-            }
-
+            if (prop.Name == "$or") return GetOrPredicate(path, prop);
             return "UNKNOWN";
         }
 
+        //AND
         return GetAndPredicate(parentObject, path);
     }
 
     private static string GetAndPredicate(JObject parentObject, string path)
     {
         var lines = new List<string>();
+        //normal object, AND predicates together
         foreach (var prop in parentObject.Properties())
         {
-            //normal object, AND predicates together
             if (prop.Value is JObject childObject)
             {
                 var childProps = childObject.Properties().Where(p => p.Name.StartsWith("$")).ToArray();
@@ -92,15 +88,12 @@ public static class QueryParser
                     foreach (var firstProp in childProps)
                     {
                         var cond = GetAnyPredicate(path, firstProp, prop);
-                        if (cond != null)
-                        {
-                            lines.Add(cond);
-                        }
+                        if (cond != null) lines.Add(cond);
                     }
                 }
                 else
                 {
-                    BuildSql(childObject, $"{path} '{prop.Name}'->");
+                    GetLogicalPredicate(childObject, $"{path} '{prop.Name}'->");
                 }
             }
             else
@@ -129,18 +122,15 @@ public static class QueryParser
     {
         var parts = (JArray)prop.Value;
         var x = parts.Cast<JObject>().ToArray();
-        var res = x.Select(y => BuildSql(y, path)).ToArray();
+        var res = x.Select(y => GetLogicalPredicate(y, path)).ToArray();
         return $"( {string.Join(" OR ", res)} )";
     }
 
     private static string GetKey(string path, JProperty prop)
     {
         var keys = prop.Name.Split(".").Select(k => $"'{k}'").ToArray();
-        var key = string.Join("->", keys.Take(keys.Length-1));
-        if (key != "")
-        {
-            key = "->" + key;
-        }
+        var key = string.Join("->", keys.Take(keys.Length - 1));
+        if (key != "") key = "->" + key;
         var last = keys.Last();
         return $"{path}{key}->>{last}";
     }

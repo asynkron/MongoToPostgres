@@ -1,7 +1,5 @@
 ﻿using Marten;
 using MongoDBQuery;
-using Newtonsoft.Json;
-
 
 var storeOptions = new StoreOptions();
 storeOptions.Connection("Server=localhost;Port=5432;Database=dummy;Uid=dummy;Pwd=dummy;");
@@ -19,15 +17,10 @@ var store = new DocumentStore(storeOptions);
 //     await session.SaveChangesAsync();
 // }
 
-
 //var json = @"{$or:[{'age.year': {$gte: 21}, name: 'julio', contribs: { $in: [ 'ALGOL', 'Lisp' ]}}, {x:123}]}";
-
 var json = @"{FirstName:'Han', 'Data.foo': 1}";
-
 var sql = QueryParser.ToSql(json, "data");
 Console.WriteLine(sql);
-
-
 
 public class User
 {
