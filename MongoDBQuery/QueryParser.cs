@@ -67,7 +67,7 @@ public static class QueryParser
     private static string BuildSql(JObject parentObject, string path)
     {
         var lines = new List<string>();
-        foreach (var prop in parentObject.Children().OfType<JProperty>())
+        foreach (var prop in parentObject.Properties())
         {
             if (prop.Name.StartsWith("$"))
             {
@@ -82,9 +82,7 @@ public static class QueryParser
             //normal object, AND predicates together
             if (prop.Value is JObject childObject)
             {
-                var childProps = childObject
-                    .Children()
-                    .OfType<JProperty>()
+                var childProps = childObject.Properties()
                     .Where(p => p.Name.StartsWith("$"))
                     .ToArray();
                 
