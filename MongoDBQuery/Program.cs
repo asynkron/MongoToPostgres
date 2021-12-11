@@ -1,5 +1,6 @@
 ﻿using Marten;
 using MongoDBQuery;
+using Newtonsoft.Json;
 
 var storeOptions = new StoreOptions();
 storeOptions.Connection("Server=localhost;Port=5432;Database=dummy;Uid=dummy;Pwd=dummy;");
@@ -9,7 +10,7 @@ var store = new DocumentStore(storeOptions);
 // {
 //     var user = new User
 //     {
-//         FirstName = "Han", LastName = "Solo", Data = JsonConvert.DeserializeObject("{'foo':1}")
+//         FirstName = "Luke", LastName = "Skywalker", Data = JsonConvert.DeserializeObject("{'foo':1, bar: [1,2,3,4,5,6,7]}")
 //     };
 //    
 //     session.Store(user);
@@ -18,11 +19,11 @@ var store = new DocumentStore(storeOptions);
 // }
 
 //var json = @"{$or:[{'age.year': {$gte: 21}, name: 'julio', contribs: { $in: [ 'ALGOL', 'Lisp' ]}}, {x: {$gt:0}]}";
-var json = @"{FirstName:'Han', 'Data.foo': {$not: {$lt:0}}}";
+var json = @"{FirstName:'Han', 'Data.foo': {$not: {$lt:0}}, 'Data.bar': [2,3]}";
 var sql = QueryParser.ToSql(json, "data");
 Console.WriteLine(sql);
-await using var session = store.QuerySession();
-var existing = await session.QueryAsync<User>(sql);
+await using var session2 = store.QuerySession();
+var existing = await session2.QueryAsync<User>(sql);
 
 foreach (var res in existing)
 {

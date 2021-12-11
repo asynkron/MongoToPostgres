@@ -33,10 +33,20 @@ public static class QueryParser
             JTokenType.Float   => prop.Value<float>().ToString(CultureInfo.InvariantCulture),
             JTokenType.String  => $"'{EscapeString(prop.Value<string>()!)}'",
             JTokenType.Boolean => prop.Value<bool>().ToString(CultureInfo.InvariantCulture),
-            JTokenType.Array   => "ARRAY",
+            JTokenType.Array   => GetArray(prop),
             JTokenType.Null    => "null",
             _                  => throw new ArgumentOutOfRangeException()
         };
+
+    private static string GetArray(JToken array)
+    {
+        var x = array as JArray;
+        var values = x.Cast<JValue>();
+        var values2 = values.Select(GetPrimitive);
+        var elements = string.Join(", ", values2);
+        var cond = $"[{elements}]";
+        return cond;
+    }
 
     private static string GetTypeHint(JToken prop) =>
         prop.Type switch
