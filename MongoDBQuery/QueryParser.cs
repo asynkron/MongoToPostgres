@@ -41,28 +41,13 @@ public static class QueryParser
 
     private static string GetInPredicate(string path, JProperty firstProp, JProperty prop)
     {
-        //$in should operate on scalar values.. TODO rewrite
-
-        var x = firstProp.Value as JArray;
+        var x = (JArray)firstProp.Value;
         var values = x.Cast<JValue>();
         var values2 = values.Select(GetPrimitive);
         var key = GetKey(path, prop);
 
         var val = string.Join(", ", values2);
         var cond = $"(({key}) IN ({val}))";
-        //     var cond = $@"(
-        // EXISTS(
-        //     SELECT t123.e123 
-        //     FROM jsonb_array_elements(({key})::jsonb) AS t123(e123) 
-        //     WHERE e123::int IN ()
-        // ))";
-
-        //     var cond = $@"(
-        // EXISTS(
-        //     SELECT t123.e123 
-        //     FROM jsonb_array_elements(({key})::jsonb) AS t123(e123) 
-        //     WHERE e123::int IN ({string.Join(", ", values2)})
-        // ))";
 
         return cond;
     }
@@ -129,12 +114,12 @@ public static class QueryParser
             _            => null
         };
 
-    private static string? GetAllMatchPredicate(string path, JProperty prop, JToken firstPropValue)
+    private static string GetAllMatchPredicate(string path, JProperty prop, JToken firstPropValue)
     {
         throw new NotImplementedException();
     }
 
-    private static string? GetElemMatchPredicate(string path, JProperty prop, JObject? predicateObject)
+    private static string GetElemMatchPredicate(string path, JProperty prop, JObject? predicateObject)
     {
         if (predicateObject == null) throw new ArgumentNullException(nameof(predicateObject));
         
@@ -151,9 +136,9 @@ public static class QueryParser
         return cond;
     }
 
-    private static string? GetNotPredicate(string path, JProperty prop, JProperty firstProp)
+    private static string GetNotPredicate(string path, JProperty prop, JProperty firstProp)
     {
-        var o = firstProp.Value as JObject;
+        var o = (JObject)firstProp.Value;
         var p = o.Properties().First();
         var x = GetAnyPredicate(path, p, prop);
         return $"(NOT {x})";
