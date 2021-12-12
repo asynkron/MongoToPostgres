@@ -6,11 +6,21 @@ var storeOptions = new StoreOptions();
 storeOptions.Connection("Server=localhost;Port=5432;Database=dummy;Uid=dummy;Pwd=dummy;");
 storeOptions.Policies.AllDocumentsAreMultiTenanted();
 var store = new DocumentStore(storeOptions);
+/*
+select data
+from mt_doc_user
+WHERE (EXISTS(
+        SELECT *
+        FROM jsonb_array_elements(data->'Data'->'children') t(data)
+        WHERE data -> 'a' = '1'::jsonb
+    ))
+ */
+
 // await using (var session = store.LightweightSession())
 // {
 //     var user = new User
 //     {
-//         FirstName = "Luke", LastName = "Skywalker", Data = JsonConvert.DeserializeObject("{'foo':1, bar: [1,2,3,4,5,6,7]}")
+//         FirstName = "Roger", LastName = "Johansson", Data = JsonConvert.DeserializeObject("{'foo':1, children: [{'a':1},{a:7}]}")
 //     };
 //    
 //     session.Store(user);
@@ -18,15 +28,8 @@ var store = new DocumentStore(storeOptions);
 //     await session.SaveChangesAsync();
 // }
 
-/*
- this works...
-select *
-from mt_doc_user
-where ( (data->'Data'->'bar') @> '[3,1,3]'::jsonb) 
- */
-//var json = @"{$or:[{'age.year': {$gte: 21}, name: 'julio', contribs: { $in: [ 'ALGOL', 'Lisp' ]}}, {x: {$gt:0}]}";
-//var json = @"{FirstName:'Luke', 'Data.foo': {$not: {$lt:0}}, 'Data.bar': {'$in': [1,2,3,4]}";
-var json = @"{ 'FirstName': 'Han', 'Data.foo':1,'Data.foo': {$not: {$lt:0}, 'Data.bar': 1}";
+
+var json = @"{ 'FirstName': ['Roger','Luke'], 'Data.foo': 1, 'Data.children' : { '$elemMatch' : { 'a':1 } }";
 var sql = QueryParser.ToSql(json, "data");
 Console.WriteLine(sql);
 await using var session2 = store.QuerySession();

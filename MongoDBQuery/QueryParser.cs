@@ -1,4 +1,3 @@
-using System.Globalization;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 
@@ -6,10 +5,6 @@ namespace MongoDBQuery;
 
 public static class QueryParser
 {
-    //TODO:
-    // * Array comparison (sub-queries?)
-    // * In vs Contains what is what here?
-
     public static string ToSql(string json, string jsonField)
     {
         if (json == null) throw new ArgumentNullException(nameof(json));
@@ -25,20 +20,24 @@ public static class QueryParser
         return cond;
     }
 
-    private static string GetPrimitive(JToken prop) =>
+    private static string GetPrimitive(JToken prop)
+    {
+        var raw = GetPrimitiveInner(prop);
+        var escaped = raw.Replace("'", "''");
+        return $"'{escaped}'::jsonb";
+    }
+
+    private static string GetPrimitiveInner(JToken prop) =>
         prop.Type switch
         {
-            JTokenType.Integer => $"'{prop}'::jsonb",
-            JTokenType.Float   => $"'{prop}'::jsonb",
-            JTokenType.String  => $"'\"{EscapeString(prop.Value<string>()!)}\"'::jsonb",
-            JTokenType.Boolean =>$"'{prop}'::jsonb",
-            JTokenType.Array   => $"'{prop}'::jsonb",
-            JTokenType.Null    => "'null'::jsonb",
+            JTokenType.Integer => $"{prop}",
+            JTokenType.Float   => $"{prop}",
+            JTokenType.String  => $"\"{prop}\"",
+            JTokenType.Boolean => $"{prop}",
+            JTokenType.Array   => $"{prop}",
+            JTokenType.Null    => "null",
             _                  => throw new ArgumentOutOfRangeException()
         };
-
-    //TODO: make proper escape
-    private static string EscapeString(string sqlStr) => sqlStr.Replace("\\", "\\\\");
 
     private static string GetInPredicate(string path, JProperty firstProp, JProperty prop)
     {
@@ -49,22 +48,22 @@ public static class QueryParser
         var values2 = values.Select(GetPrimitive);
         var key = GetKey(path, prop);
 
-        var val = string.Join(", ", values2) ;
+        var val = string.Join(", ", values2);
         var cond = $"(({key}) IN ({val}))";
-    //     var cond = $@"(
-    // EXISTS(
-    //     SELECT t123.e123 
-    //     FROM jsonb_array_elements(({key})::jsonb) AS t123(e123) 
-    //     WHERE e123::int IN ()
-    // ))";
-    
-    //     var cond = $@"(
-    // EXISTS(
-    //     SELECT t123.e123 
-    //     FROM jsonb_array_elements(({key})::jsonb) AS t123(e123) 
-    //     WHERE e123::int IN ({string.Join(", ", values2)})
-    // ))";
-        
+        //     var cond = $@"(
+        // EXISTS(
+        //     SELECT t123.e123 
+        //     FROM jsonb_array_elements(({key})::jsonb) AS t123(e123) 
+        //     WHERE e123::int IN ()
+        // ))";
+
+        //     var cond = $@"(
+        // EXISTS(
+        //     SELECT t123.e123 
+        //     FROM jsonb_array_elements(({key})::jsonb) AS t123(e123) 
+        //     WHERE e123::int IN ({string.Join(", ", values2)})
+        // ))";
+
         return cond;
     }
 
@@ -125,7 +124,7 @@ public static class QueryParser
             "$lt"        => GetPredicate(path, prop, firstProp.Value, "<"),
             "$lte"       => GetPredicate(path, prop, firstProp.Value, "<="),
             "$regex"     => GetPredicate(path, prop, firstProp.Value, "~"),
-            "$elemMatch" => GetElemMatchPredicate(path, prop, firstProp.Value),
+            "$elemMatch" => GetElemMatchPredicate(path, prop, firstProp.Value as JObject),
             "$all"       => GetAllMatchPredicate(path, prop, firstProp.Value),
             _            => null
         };
@@ -135,9 +134,21 @@ public static class QueryParser
         throw new NotImplementedException();
     }
 
-    private static string? GetElemMatchPredicate(string path, JProperty prop, JToken firstPropValue)
+    private static string? GetElemMatchPredicate(string path, JProperty prop, JObject? predicateObject)
     {
-        throw new NotImplementedException();
+        if (predicateObject == null) throw new ArgumentNullException(nameof(predicateObject));
+        
+        var key = GetKey(path, prop);
+        var pred = GetLogicalPredicate(predicateObject, "data");
+
+        var cond = 
+            $@"EXISTS (SELECT true 
+            FROM jsonb_array_elements({key}) AS t(data)
+            WHERE
+            {pred}
+        )";
+
+        return cond;
     }
 
     private static string? GetNotPredicate(string path, JProperty prop, JProperty firstProp)
