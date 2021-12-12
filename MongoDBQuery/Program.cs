@@ -18,13 +18,19 @@ var store = new DocumentStore(storeOptions);
 //     await session.SaveChangesAsync();
 // }
 
+/*
+ this works...
+select *
+from mt_doc_user
+where ( (data->'Data'->'bar') @> '[3,1,3]'::jsonb) 
+ */
 //var json = @"{$or:[{'age.year': {$gte: 21}, name: 'julio', contribs: { $in: [ 'ALGOL', 'Lisp' ]}}, {x: {$gt:0}]}";
 //var json = @"{FirstName:'Luke', 'Data.foo': {$not: {$lt:0}}, 'Data.bar': {'$in': [1,2,3,4]}";
-var json = @"{ 'FirstName': {'$in': ['Han','Luke']},'Data.foo': {$not: {$lt:0}}";
+var json = @"{ 'FirstName': {'$in': ['Han','Luke']}, 'Data.bar':1,'Data.foo': {$not: {$lt:0}}";
 var sql = QueryParser.ToSql(json, "data");
 Console.WriteLine(sql);
 await using var session2 = store.QuerySession();
-var existing = await session2.QueryAsync<User>(sql);
+var existing = await session2.QueryAsync<User>("where (ARRAY[1,4,3] @> ARRAY[3,1,3])");
 
 foreach (var res in existing)
 {
