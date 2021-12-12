@@ -28,24 +28,14 @@ public static class QueryParser
     private static string GetPrimitive(JToken prop) =>
         prop.Type switch
         {
-            JTokenType.Integer => $"'{prop.Value<int>().ToString(CultureInfo.InvariantCulture)}'::jsonb",
-            JTokenType.Float   => $"'{prop.Value<float>().ToString(CultureInfo.InvariantCulture)}'::jsonb",
-            JTokenType.String  => $"'\"{EscapeString(prop.Value<string>()!)}\"'"+ "::jsonb",
-            JTokenType.Boolean =>$"'{prop.Value<bool>().ToString(CultureInfo.InvariantCulture)}'::jsonb",
-            JTokenType.Array   => GetArray(prop),
-            JTokenType.Null    => "null",
+            JTokenType.Integer => $"'{prop}'::jsonb",
+            JTokenType.Float   => $"'{prop}'::jsonb",
+            JTokenType.String  => $"'\"{EscapeString(prop.Value<string>()!)}\"'::jsonb",
+            JTokenType.Boolean =>$"'{prop}'::jsonb",
+            JTokenType.Array   => $"'{prop}'::jsonb",
+            JTokenType.Null    => "'null'::jsonb",
             _                  => throw new ArgumentOutOfRangeException()
         };
-
-    private static string GetArray(JToken array)
-    {
-        var x = array as JArray;
-        var values = x.Cast<JValue>();
-        var values2 = values.Select(GetPrimitive);
-        var elements = string.Join(", ", values2);
-        var cond = $"[{elements}]";
-        return cond;
-    }
 
     //TODO: make proper escape
     private static string EscapeString(string sqlStr) => sqlStr.Replace("\\", "\\\\");
@@ -115,7 +105,7 @@ public static class QueryParser
             }
             else
             {
-                var predicate = GetPredicate(path, prop, prop.Value, "=");
+                var predicate = GetPredicate(path, prop, prop.Value, "<@");
                 lines.Add(predicate);
             }
         }
